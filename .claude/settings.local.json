@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(psql:*)",
+      "Bash(brew services:*)",
+      "Bash(pg_config:*)",
+      "Bash(docker:*)",
+      "Bash(npm run docker:up:*)",
+      "Bash(open:*)",
+      "Bash(npm install)",
+      "Bash(sudo brew services stop:*)",
+      "Bash(lsof:*)",
+      "Bash(kill:*)",
+      "Bash(npm run setup:*)",
+      "Bash(npm run docker:down:*)",
+      "Bash(rm:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

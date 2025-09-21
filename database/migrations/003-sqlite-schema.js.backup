@@ -1,0 +1,134 @@
+'use strict';
+
+module.exports = {
+  up: async (queryInterface, Sequelize) => {
+    // Criar tabela users para SQLite
+    await queryInterface.createTable('users', {
+      id: {
+        type: Sequelize.UUID,
+        defaultValue: Sequelize.UUIDV4,
+        primaryKey: true
+      },
+      username: {
+        type: Sequelize.STRING,
+        allowNull: false,
+        unique: true
+      },
+      password: {
+        type: Sequelize.STRING,
+        allowNull: false
+      },
+      company_name: {
+        type: Sequelize.STRING(200),
+        allowNull: false
+      },
+      user_type: {
+        type: Sequelize.ENUM('BUYER', 'SUPPLIER'),
+        allowNull: false
+      },
+      company_cnpj: {
+        type: Sequelize.STRING(14),
+        allowNull: false,
+        unique: true
+      },
+      created_at: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
+      },
+      updated_at: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
+      }
+    });
+
+    // Criar tabela areas para SQLite
+    await queryInterface.createTable('areas', {
+      id: {
+        type: Sequelize.UUID,
+        defaultValue: Sequelize.UUIDV4,
+        primaryKey: true
+      },
+      name: {
+        type: Sequelize.STRING(100),
+        allowNull: false
+      },
+      supplier_cnpj: {
+        type: Sequelize.STRING(14),
+        allowNull: false,
+        references: {
+          model: 'users',
+          key: 'company_cnpj'
+        }
+      },
+      point1_x: {
+        type: Sequelize.DECIMAL(10, 8),
+        allowNull: false
+      },
+      point1_y: {
+        type: Sequelize.DECIMAL(11, 8),
+        allowNull: false
+      },
+      point2_x: {
+        type: Sequelize.DECIMAL(10, 8),
+        allowNull: false
+      },
+      point2_y: {
+        type: Sequelize.DECIMAL(11, 8),
+        allowNull: false
+      },
+      point3_x: {
+        type: Sequelize.DECIMAL(10, 8),
+        allowNull: false
+      },
+      point3_y: {
+        type: Sequelize.DECIMAL(11, 8),
+        allowNull: false
+      },
+      point4_x: {
+        type: Sequelize.DECIMAL(10, 8),
+        allowNull: false
+      },
+      point4_y: {
+        type: Sequelize.DECIMAL(11, 8),
+        allowNull: false
+      },
+      total_area: {
+        type: Sequelize.DECIMAL(10, 2),
+        allowNull: false
+      },
+      carbon_credits: {
+        type: Sequelize.DECIMAL(10, 2),
+        allowNull: false
+      },
+      is_allocated: {
+        type: Sequelize.BOOLEAN,
+        defaultValue: false
+      },
+      buyer_cnpj: {
+        type: Sequelize.STRING(14),
+        allowNull: true,
+        references: {
+          model: 'users',
+          key: 'company_cnpj'
+        }
+      },
+      created_at: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
+      },
+      updated_at: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
+      }
+    });
+  },
+
+  down: async (queryInterface, Sequelize) => {
+    await queryInterface.dropTable('areas');
+    await queryInterface.dropTable('users');
+  }
+};

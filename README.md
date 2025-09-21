@@ -4,15 +4,21 @@ Sistema backend para plataforma de créditos de carbono desenvolvido em Node.js 
 
 ## 🌱 Funcionalidades
 
-### MVP (Requisitos Implementados)
+### ✅ Implementado (Integração Frontend-Backend)
 
-- **[00] Validação de Créditos**: Sistema completo de verificação e validação de créditos de carbono
-- **[02] Dashboard**: Dashboard personalizado por tipo de usuário (fornecedor, comprador, governo, cidadão)
-- **[03] Cálculo de Créditos**: Algoritmo automático para cálculo de créditos de carbono baseado em área e tipo de floresta
-- **[07] Empresas Fornecedoras**: Sistema para encontrar e avaliar empresas fornecedoras confiáveis
-- **[08] Comprovação de Confiabilidade**: Sistema de reputação e avaliações para fornecedores
+- **🔐 Autenticação**: Sistema completo de login e cadastro de usuários
+- **👤 Usuários**: Gerenciamento de usuários com tipos BUYER e SUPPLIER
+- **🏢 Empresas**: Cadastro com CNPJ, validações e informações corporativas
+- **🔒 Segurança**: JWT, hash de senhas, validações server-side e client-side
+- **🎨 Interface**: React + TypeScript + Material-UI integrado
+
+### 🚧 Em Desenvolvimento
+
+- **[00] Validação de Créditos**: Sistema de verificação e validação de créditos de carbono
+- **[02] Dashboard**: Dashboard personalizado por tipo de usuário
+- **[03] Cálculo de Créditos**: Algoritmo automático para cálculo baseado em área
 - **[12] Cadastro de Áreas**: CRUD completo para gerenciamento de áreas florestais
-- **[13] Cálculo para Fornecedores**: Ferramenta para fornecedores calcularem créditos das suas áreas
+- **[13] Cálculo para Fornecedores**: Ferramenta para cálculo de créditos
 
 ## 🚀 Tecnologias
 
@@ -58,11 +64,33 @@ docker-compose up -d
 - **Adminer (DB Admin)**: http://localhost:8080
 - **PostgreSQL**: localhost:5432
 
-### 👤 Usuários de teste criados automaticamente:
+### 👤 Como criar usuários de teste:
 
-- **Admin**: admin@carboncredits.com / admin123
-- **Fornecedor**: supplier@example.com / supplier123
-- **Comprador**: buyer@company.com / buyer123
+Após subir o sistema, use o frontend em `http://localhost:3001/cadastro` ou faça requisições diretas:
+
+```bash
+# Criar usuário fornecedor
+curl -X POST http://localhost:3000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "fornecedor@empresa.com",
+    "password": "123456",
+    "userType": "SUPPLIER",
+    "companyName": "Empresa Fornecedora",
+    "companyCnpj": "12345678901234"
+  }'
+
+# Criar usuário comprador
+curl -X POST http://localhost:3000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "comprador@empresa.com",
+    "password": "123456",
+    "userType": "BUYER",
+    "companyName": "Empresa Compradora",
+    "companyCnpj": "43210987654321"
+  }'
+```
 
 ## 🛠️ Desenvolvimento Local
 
@@ -186,28 +214,49 @@ POST /api/verification/credit/:id/validate    # Validar (governo)
 GET  /api/verification/pending                # Pendentes (governo)
 ```
 
-## 🔒 Tipos de Usuário
+## 🔒 Tipos de Usuário (Implementados)
 
-- **🌳 SUPPLIER**: Gerencia áreas, cria e vende créditos
-- **💼 BUYER**: Compra créditos, acompanha compensações
-- **🏛️ GOVERNMENT**: Verifica créditos, monitora plataforma
-- **👤 CITIZEN**: Visualiza informações públicas
+- **🌳 SUPPLIER**: Fornecedor de créditos de carbono
+  - Pode cadastrar áreas florestais
+  - Gera créditos de carbono de suas áreas
+  - Empresa com CNPJ
+
+- **💼 BUYER**: Comprador de créditos de carbono
+  - Pode comprar/alocar créditos
+  - Empresa com CNPJ
+  - Visualiza relatórios de compensação
 
 ## 🐘 Banco de Dados (PostgreSQL + Sequelize)
 
-### Esquema Principal:
-- **users** - Usuários do sistema
-- **areas** - Áreas florestais
-- **carbon_credits** - Créditos de carbono
-- **companies** - Empresas cadastradas
-- **user_reviews** - Avaliações de usuários
-- **company_reviews** - Avaliações de empresas
+### Esquema Atual (Implementado):
 
-### Relacionamentos:
-- 1 User → N Areas
-- 1 Area → N CarbonCredits
-- 1 User → N Companies (como owner)
-- 1 CarbonCredit → 1 Supplier, 1 Buyer
+#### **users** - Usuários do sistema
+```sql
+- id (UUID, PK)
+- username (STRING, UNIQUE) -- email do usuário
+- password (STRING) -- hash bcrypt
+- company_name (STRING) -- nome da empresa
+- user_type (ENUM: 'BUYER', 'SUPPLIER') -- tipo de usuário
+- company_cnpj (STRING(14), UNIQUE) -- CNPJ da empresa
+- created_at, updated_at
+```
+
+#### **areas** - Áreas florestais (estrutura preparada)
+```sql
+- id (UUID, PK)
+- name (STRING) -- nome da área
+- supplier_cnpj (STRING, FK → users.company_cnpj)
+- point1_x, point1_y, point2_x, point2_y, point3_x, point3_y, point4_x, point4_y (DECIMAL) -- coordenadas
+- total_area (DECIMAL) -- área total
+- carbon_credits (DECIMAL) -- créditos de carbono
+- is_allocated (BOOLEAN) -- se está alocada
+- buyer_cnpj (STRING, FK → users.company_cnpj, nullable)
+- created_at, updated_at
+```
+
+### Relacionamentos Implementados:
+- 1 User (SUPPLIER) → N Areas (como fornecedor)
+- 1 User (BUYER) → N Areas (como comprador, quando alocadas)
 
 ### Sequelize Features:
 - ✅ Migrations automáticas

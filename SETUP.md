@@ -190,26 +190,29 @@ npm run docker:up
 ```
 
 Este comando irá:
-- Criar e iniciar o container PostgreSQL na porta 5433
+- Criar e iniciar o container PostgreSQL na porta 5432
 - Criar e iniciar o container da aplicação na porta 3000
 - Criar e iniciar o Adminer (interface web do banco) na porta 8080
 
 ### 2. Configurar o Banco de Dados
 ```bash
-npm run setup
+# Instalar dependências
+npm install
+
+# Executar migrações para criar as tabelas
+npm run db:migrate
 ```
 
-Este comando irá:
-- Instalar todas as dependências Node.js
-- Criar o banco de dados
-- Executar as migrations (criar tabelas)
-- Popular o banco com dados de exemplo
+**Nota**: O sistema atual não possui seeds automáticos. Os usuários devem ser criados através:
+- Frontend em `http://localhost:3001/cadastro`
+- Ou via API diretamente (veja exemplos no README.md)
 
 ### 3. Verificar se Está Funcionando
 
 Acesse os seguintes endereços no seu navegador:
 
 - **API Backend**: http://localhost:3000
+- **Frontend React**: http://localhost:3001 (se configurado)
 - **Adminer (Interface do Banco)**: http://localhost:8080
 
 Para acessar o Adminer:
@@ -290,19 +293,35 @@ npm run db:seed
 ```
 carbon-credits-backend/
 ├── config/                 # Configurações do banco de dados
-├── database/              # Migrations, models e seeders
+│   └── database.js        # Conexão com PostgreSQL
+├── database/              # Migrations, models e seeders (Sequelize)
 │   ├── config/           # Configuração do Sequelize
+│   │   └── config.js     # Config para PostgreSQL
 │   ├── migrations/       # Scripts de criação/alteração do banco
+│   │   └── 001-create-users-areas.js  # Migração principal
 │   ├── models/          # Modelos do banco de dados
-│   └── seeders/         # Dados de exemplo
-├── scripts/              # Scripts de configuração
+│   │   ├── User.js      # Modelo de usuário (implementado)
+│   │   ├── Area.js      # Modelo de área (preparado)
+│   │   └── index.js     # Exportação dos modelos
+│   └── seeders/         # Dados de exemplo (opcional)
 ├── src/                  # Código fonte da aplicação
-├── tests/               # Testes automatizados
-├── docker-compose.yml   # Configuração dos containers Docker
-├── Dockerfile          # Imagem Docker da aplicação
-├── package.json        # Dependências e scripts NPM
+│   ├── controllers/     # Controladores das rotas
+│   │   └── authController.js  # Auth, login, cadastro
+│   ├── middleware/      # Middlewares
+│   │   ├── auth.js      # Middleware de autenticação JWT
+│   │   └── validation.js # Validação de dados (Joi)
+│   ├── routes/          # Rotas da API
+│   │   ├── auth.js      # Rotas de autenticação
+│   │   └── areas.js     # Rotas de áreas (preparado)
+│   ├── services/        # Serviços de negócio
+│   └── server.js        # Servidor principal
+├── Front-end/           # Frontend React (integrado)
+│   └── sftf_front/      # Aplicação React + TypeScript
+├── docker-compose.yml   # PostgreSQL, Adminer, App
+├── package.json        # Dependências Node.js
 ├── .env               # Variáveis de ambiente
-└── README.md          # Documentação principal
+├── README.md          # Documentação principal
+└── SETUP.md           # Este guia de instalação
 ```
 
 ## 🔧 Solução de Problemas
@@ -371,10 +390,18 @@ npm run setup
 
 ## 📚 Próximos Passos
 
-1. **Explore a API**: Use ferramentas como Postman ou Insomnia para testar os endpoints
-2. **Consulte o banco**: Use o Adminer para visualizar e editar dados
-3. **Leia a documentação**: Confira o README.md para mais detalhes sobre a arquitetura
-4. **Desenvolva**: Comece a criar novas funcionalidades!
+1. **Teste a integração**: Acesse o frontend em `http://localhost:3001` e teste login/cadastro
+2. **Explore a API**: Use ferramentas como Postman ou curl para testar os endpoints
+3. **Consulte o banco**: Use o Adminer para visualizar usuários cadastrados
+4. **Leia a documentação**: Confira o README.md e `INTEGRACAO_LOGIN_CADASTRO.md`
+5. **Desenvolva**: Implemente novas funcionalidades como áreas e créditos de carbono
+
+### 🔐 Funcionalidades Implementadas
+- ✅ Sistema de autenticação JWT
+- ✅ Cadastro e login de usuários
+- ✅ Validações de CNPJ e dados corporativos
+- ✅ Integração frontend-backend completa
+- ✅ Tratamento de erros e UX
 
 ## 🆘 Precisa de Ajuda?
 

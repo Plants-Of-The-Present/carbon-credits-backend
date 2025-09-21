@@ -1,5 +1,5 @@
 const { Sequelize } = require('sequelize');
-const config = require('./sequelize.config.js');
+const config = require('../database/config/config.js');
 
 const env = process.env.NODE_ENV || 'development';
 const dbConfig = config[env];
@@ -30,7 +30,7 @@ const connectDB = async () => {
     }
 
   } catch (error) {
-    console.error('❌ Error connecting to PostgreSQL:', error.message);
+    console.error('❌ Error connecting to database:', error.message);
     process.exit(1);
   }
 };

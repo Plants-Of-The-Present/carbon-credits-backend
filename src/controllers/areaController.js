@@ -6,7 +6,7 @@ const createArea = async (req, res, next) => {
       name,
       point1X, point1Y, point2X, point2Y,
       point3X, point3Y, point4X, point4Y,
-      totalArea, carbonCredits, isAllocated, buyerCnpj
+      isAllocated, buyerCnpj
     } = req.body;
 
     // Get user's CNPJ
@@ -18,12 +18,26 @@ const createArea = async (req, res, next) => {
       });
     }
 
+    // Create temporary area instance to calculate values
+    const tempArea = Area.build({
+      point1X, point1Y, point2X, point2Y,
+      point3X, point3Y, point4X, point4Y
+    });
+
+    // Calculate area and credits BEFORE creating in database
+    const calculatedArea = tempArea.calculateAreaFromCoordinates();
+    const calculatedCredits = tempArea.calculateCarbonCredits();
+
+    // Create area with calculated values
     const areaData = {
       name,
       point1X, point1Y, point2X, point2Y,
       point3X, point3Y, point4X, point4Y,
-      totalArea, carbonCredits, isAllocated, buyerCnpj,
-      supplierCnpj: user.companyCnpj
+      isAllocated: isAllocated || false,
+      buyerCnpj,
+      supplierCnpj: user.companyCnpj,
+      totalArea: calculatedArea,
+      carbonCredits: calculatedCredits
     };
 
     const area = await Area.create(areaData);
@@ -35,7 +49,13 @@ const createArea = async (req, res, next) => {
     res.status(201).json({
       success: true,
       message: 'Área cadastrada com sucesso',
-      data: { area: areaWithSupplier }
+      data: {
+        area: areaWithSupplier,
+        calculations: {
+          calculatedArea: calculatedArea,
+          calculatedCredits: calculatedCredits
+        }
+      }
     });
   } catch (error) {
     next(error);
@@ -282,18 +302,30 @@ const getMyAreas = async (req, res, next) => {
     const { count, rows: areas } = await Area.findAndCountAll({
       where,
       include: [
-        { model: User, as: 'supplier' },
-        { model: Image, as: 'image' }
+        { model: User, as: 'supplier' }
       ],
       order: [['created_at', 'DESC']],
       offset,
       limit
     });
 
+    // Find images by coordinates for each area
+    const areasWithImages = await Promise.all(areas.map(async (area) => {
+      const image = await Image.findByCoordinates(
+        area.point1X, area.point1Y, area.point2X, area.point2Y,
+        area.point3X, area.point3Y, area.point4X, area.point4Y
+      );
+
+      return {
+        ...area.toJSON(),
+        image
+      };
+    }));
+
     res.json({
       success: true,
       data: {
-        areas,
+        areas: areasWithImages,
         pagination: {
           currentPage: page,
           totalPages: Math.ceil(count / limit),
@@ -310,31 +342,24 @@ const getMyAreas = async (req, res, next) => {
 
 const uploadAreaImage = async (req, res, next) => {
   try {
-    const { areaId, url, point1X, point1Y, point2X, point2Y, point3X, point3Y, point4X, point4Y } = req.body;
+    const { url, point1X, point1Y, point2X, point2Y, point3X, point3Y, point4X, point4Y } = req.body;
 
-    const area = await Area.findByPk(areaId);
-    if (!area) {
+    // Get user for authorization
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
       return res.status(404).json({
         success: false,
-        error: 'Área não encontrada'
+        error: 'Usuário não encontrado'
       });
     }
 
-    // Check if user is the supplier (owner)
-    const user = await User.findByPk(req.user.id);
-    if (area.supplierCnpj !== user.companyCnpj) {
-      return res.status(403).json({
-        success: false,
-        error: 'Apenas o fornecedor pode fazer upload de imagem para esta área'
-      });
-    }
+    // Check if image already exists for these coordinates
+    const existingImage = await Image.findByCoordinates(
+      point1X, point1Y, point2X, point2Y, point3X, point3Y, point4X, point4Y
+    );
 
-    // Check if image already exists for this area
-    const existingImage = await Image.findOne({ where: { areaId } });
     if (existingImage) {
-      await existingImage.update({
-        url, point1X, point1Y, point2X, point2Y, point3X, point3Y, point4X, point4Y
-      });
+      await existingImage.update({ url });
 
       res.json({
         success: true,
@@ -342,8 +367,39 @@ const uploadAreaImage = async (req, res, next) => {
         data: { image: existingImage }
       });
     } else {
+      // Create new image with auto-ordered coordinates
+      const tempArea = { point1X, point1Y, point2X, point2Y, point3X, point3Y, point4X, point4Y };
+      const points = [
+        { x: parseFloat(point1X), y: parseFloat(point1Y) },
+        { x: parseFloat(point2X), y: parseFloat(point2Y) },
+        { x: parseFloat(point3X), y: parseFloat(point3Y) },
+        { x: parseFloat(point4X), y: parseFloat(point4Y) }
+      ];
+
+      // Auto-order coordinates
+      const centroidX = points.reduce((sum, p) => sum + p.x, 0) / points.length;
+      const centroidY = points.reduce((sum, p) => sum + p.y, 0) / points.length;
+
+      const pointsWithAngles = points.map(point => {
+        const deltaX = point.x - centroidX;
+        const deltaY = point.y - centroidY;
+        const angle = Math.atan2(deltaY, deltaX);
+        return { ...point, angle };
+      });
+
+      pointsWithAngles.sort((a, b) => a.angle - b.angle);
+      const orderedPoints = pointsWithAngles.map(({ x, y }) => ({ x, y }));
+
       const image = await Image.create({
-        areaId, url, point1X, point1Y, point2X, point2Y, point3X, point3Y, point4X, point4Y
+        url,
+        point1X: orderedPoints[0].x,
+        point1Y: orderedPoints[0].y,
+        point2X: orderedPoints[1].x,
+        point2Y: orderedPoints[1].y,
+        point3X: orderedPoints[2].x,
+        point3Y: orderedPoints[2].y,
+        point4X: orderedPoints[3].x,
+        point4Y: orderedPoints[3].y
       });
 
       res.status(201).json({

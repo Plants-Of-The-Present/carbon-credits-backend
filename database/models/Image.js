@@ -105,14 +105,14 @@ module.exports = (sequelize, DataTypes) => {
     // Search for image with these ordered coordinates
     return await Image.findOne({
       where: {
-        point1X: orderedPoints[0].x,
-        point1Y: orderedPoints[0].y,
-        point2X: orderedPoints[1].x,
-        point2Y: orderedPoints[1].y,
-        point3X: orderedPoints[2].x,
-        point3Y: orderedPoints[2].y,
-        point4X: orderedPoints[3].x,
-        point4Y: orderedPoints[3].y
+        point1X: points[0].x,
+        point1Y: points[0].y,
+        point2X: points[1].x,
+        point2Y: points[1].y,
+        point3X: points[2].x,
+        point3Y: points[2].y,
+        point4X: points[3].x,
+        point4Y: points[3].y
       }
     });
   };

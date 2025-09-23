@@ -1,4 +1,5 @@
 const { Area, User, Image } = require('../../database/models');
+const aiService = require('../services/aiService');
 
 const createArea = async (req, res, next) => {
   try {
@@ -24,23 +25,49 @@ const createArea = async (req, res, next) => {
       point3X, point3Y, point4X, point4Y
     });
 
-    // Calculate area and credits BEFORE creating in database
+    // Calculate area BEFORE creating in database
     const calculatedArea = tempArea.calculateAreaFromCoordinates();
-    const calculatedCredits = tempArea.calculateCarbonCredits();
 
     // Search for corresponding image by coordinates
     let imageUrl = null;
+    let calculatedCredits = 0;
+    let aiAnalysis = null;
+
     try {
       const correspondingImage = await Image.findByCoordinates(
         point1X, point1Y, point2X, point2Y,
         point3X, point3Y, point4X, point4Y
       );
+
       if (correspondingImage) {
         imageUrl = correspondingImage.url;
+
+        // Use IA para calcular créditos baseado na imagem
+        try {
+          console.log('🤖 Usando IA para calcular créditos de carbono...');
+          const aiResult = await aiService.calculateCarbonCredits(imageUrl);
+
+          if (aiResult.success) {
+            calculatedCredits = aiResult.carbonCredits;
+            aiAnalysis = aiResult.forestAnalysis;
+            console.log(`✅ IA calculou ${calculatedCredits} créditos de carbono`);
+          } else {
+            console.log('⚠️  IA indisponível, créditos definidos como 0');
+            calculatedCredits = 0;
+          }
+        } catch (error) {
+          console.error('❌ Erro na análise da IA:', error.message);
+          console.log('⚠️  Fallback: créditos definidos como 0');
+          calculatedCredits = 0;
+        }
+      } else {
+        // Sem imagem correspondente, créditos = 0
+        console.log('⚠️  Nenhuma imagem correspondente encontrada, créditos = 0');
+        calculatedCredits = 0;
       }
     } catch (error) {
       console.log('Erro ao buscar imagem correspondente:', error.message);
-      // Continue sem imagem se houver erro
+      calculatedCredits = 0;
     }
 
     // Create area with calculated values and image URL
@@ -69,7 +96,10 @@ const createArea = async (req, res, next) => {
         area: areaWithSupplier,
         calculations: {
           calculatedArea: calculatedArea,
-          calculatedCredits: calculatedCredits
+          calculatedCredits: calculatedCredits,
+          aiAnalysis: aiAnalysis,
+          hasImage: !!imageUrl,
+          usedAI: !!aiAnalysis
         }
       }
     });

@@ -1,0 +1,23 @@
+# Modelo de IA - incluir apenas arquivos essenciais
+# modelo_keras/ - REMOVIDO do gitignore para incluir no repo
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.env
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

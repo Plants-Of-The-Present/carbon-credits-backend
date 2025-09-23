@@ -104,6 +104,11 @@ module.exports = (sequelize, DataTypes) => {
       validate: {
         len: [14, 14]
       }
+    },
+    link_image: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      comment: 'URL da imagem correspondente às coordenadas da área'
     }
   }, {
     tableName: 'areas'

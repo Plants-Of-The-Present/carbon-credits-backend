@@ -28,7 +28,22 @@ const createArea = async (req, res, next) => {
     const calculatedArea = tempArea.calculateAreaFromCoordinates();
     const calculatedCredits = tempArea.calculateCarbonCredits();
 
-    // Create area with calculated values
+    // Search for corresponding image by coordinates
+    let imageUrl = null;
+    try {
+      const correspondingImage = await Image.findByCoordinates(
+        point1X, point1Y, point2X, point2Y,
+        point3X, point3Y, point4X, point4Y
+      );
+      if (correspondingImage) {
+        imageUrl = correspondingImage.url;
+      }
+    } catch (error) {
+      console.log('Erro ao buscar imagem correspondente:', error.message);
+      // Continue sem imagem se houver erro
+    }
+
+    // Create area with calculated values and image URL
     const areaData = {
       name,
       point1X, point1Y, point2X, point2Y,
@@ -37,7 +52,8 @@ const createArea = async (req, res, next) => {
       buyerCnpj,
       supplierCnpj: user.companyCnpj,
       totalArea: calculatedArea,
-      carbonCredits: calculatedCredits
+      carbonCredits: calculatedCredits,
+      link_image: imageUrl
     };
 
     const area = await Area.create(areaData);
@@ -316,23 +332,26 @@ const getMyAreas = async (req, res, next) => {
       limit
     });
 
-    // Find images by coordinates for each area
-    const areasWithImages = await Promise.all(areas.map(async (area) => {
-      const image = await Image.findByCoordinates(
-        area.point1X, area.point1Y, area.point2X, area.point2Y,
-        area.point3X, area.point3Y, area.point4X, area.point4Y
-      );
+    // Areas já contêm link_image, não precisamos mais buscar imagens separadamente
+    const areasData = areas.map(area => {
+      const areaJson = area.toJSON();
 
-      return {
-        ...area.toJSON(),
-        image
-      };
-    }));
+      // Se tiver link_image, criar objeto image para compatibilidade com frontend
+      if (areaJson.link_image) {
+        areaJson.image = {
+          url: areaJson.link_image
+        };
+      } else {
+        areaJson.image = null;
+      }
+
+      return areaJson;
+    });
 
     res.json({
       success: true,
       data: {
-        areas: areasWithImages,
+        areas: areasData,
         pagination: {
           currentPage: page,
           totalPages: Math.ceil(count / limit),

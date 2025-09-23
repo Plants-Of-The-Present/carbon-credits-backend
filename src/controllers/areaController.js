@@ -244,12 +244,12 @@ const calculateCarbonCredits = async (req, res, next) => {
       });
     }
 
-    // Check if user is the supplier (owner)
+    // Check if user has access to this area (either as supplier or buyer)
     const user = await User.findByPk(req.user.id);
-    if (area.supplierCnpj !== user.companyCnpj) {
+    if (area.supplierCnpj !== user.companyCnpj && area.buyerCnpj !== user.companyCnpj) {
       return res.status(403).json({
         success: false,
-        error: 'Apenas o fornecedor pode calcular créditos desta área'
+        error: 'Você não tem permissão para calcular créditos desta área'
       });
     }
 
@@ -286,13 +286,20 @@ const getMyAreas = async (req, res, next) => {
       });
     }
 
+    const { Op } = require('sequelize');
     const where = {};
 
-    // Show areas where user is supplier or buyer
+    // Show areas where user is supplier OR buyer (both types can create and buy areas)
     if (user.userType === 'SUPPLIER') {
-      where.supplierCnpj = user.companyCnpj;
+      where[Op.or] = [
+        { supplierCnpj: user.companyCnpj },
+        { buyerCnpj: user.companyCnpj }
+      ];
     } else if (user.userType === 'BUYER') {
-      where.buyerCnpj = user.companyCnpj;
+      where[Op.or] = [
+        { supplierCnpj: user.companyCnpj },
+        { buyerCnpj: user.companyCnpj }
+      ];
     }
 
     if (req.query.isAllocated !== undefined) {

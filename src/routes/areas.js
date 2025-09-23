@@ -23,7 +23,7 @@ router.use(auth);
 router.post('/', createArea);
 router.put('/:id', updateArea);
 router.delete('/:id', deleteArea);
-router.post('/:id/calculate-credits', authorize('supplier'), calculateCarbonCredits);
-router.post('/upload-image', authorize('supplier'), uploadAreaImage);
+router.post('/:id/calculate-credits', calculateCarbonCredits);
+router.post('/upload-image', uploadAreaImage);
 
 module.exports = router;

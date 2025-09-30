@@ -1,6 +1,10 @@
 const { Area, User, Image } = require('../../database/models');
 const aiService = require('../services/aiService');
 
+const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
+const MAP_SIZE = '600x400';
+const MAP_TYPE = 'satellite';
+
 const createArea = async (req, res, next) => {
   try {
     const {
@@ -34,39 +38,48 @@ const createArea = async (req, res, next) => {
     let aiAnalysis = null;
 
     try {
-      const correspondingImage = await Image.findByCoordinates(
-        point1X, point1Y, point2X, point2Y,
-        point3X, point3Y, point4X, point4Y
-      );
+      const visiblePoints = [
+        `${point1Y},${point1X}`,
+        `${point2Y},${point2X}`,
+        `${point3Y},${point3X}`,
+        `${point4Y},${point4X}`,
+      ].join('|');
 
-      if (correspondingImage) {
-        imageUrl = correspondingImage.url;
+      const avgLat = (point1Y + point2Y + point3Y + point4Y) / 4;
+      const avgLng = (point1X + point2X + point3X + point4X) / 4;
+      const centerPoint = `${avgLat},${avgLng}`;
 
-        // Use IA para calcular créditos baseado na imagem
-        try {
-          console.log('🤖 Usando IA para calcular créditos de carbono...');
-          const aiResult = await aiService.calculateCarbonCredits(imageUrl);
+      imageUrl = `https://maps.googleapis.com/maps/api/staticmap?` +
+                 `size=${MAP_SIZE}&` +
+                 `maptype=${MAP_TYPE}&` +
+                 `center=${centerPoint}&` +
+                 `visible=${visiblePoints}&` +
+                 `key=${GOOGLE_MAPS_API_KEY}`;
+      
+      imageSource = 'Google Maps Static API';
+      console.log(`URL da Imagem Gerada: ${imageUrl}`);
 
-          if (aiResult.success) {
-            calculatedCredits = aiResult.carbonCredits;
-            aiAnalysis = aiResult.forestAnalysis;
-            console.log(`✅ IA calculou ${calculatedCredits} créditos de carbono`);
-          } else {
-            console.log('⚠️  IA indisponível, créditos definidos como 0');
-            calculatedCredits = 0;
-          }
-        } catch (error) {
-          console.error('❌ Erro na análise da IA:', error.message);
-          console.log('⚠️  Fallback: créditos definidos como 0');
+      // Use IA para calcular créditos baseado na imagem
+      try {
+        console.log('🤖 Usando IA para calcular créditos de carbono...');
+        const aiResult = await aiService.calculateCarbonCredits(imageUrl);
+
+        if (aiResult.success) {
+          calculatedCredits = aiResult.carbonCredits;
+          aiAnalysis = aiResult.forestAnalysis;
+          console.log(`✅ IA calculou ${calculatedCredits} créditos de carbono`);
+        } else {
+          console.log('⚠️  IA indisponível, créditos definidos como 0');
           calculatedCredits = 0;
         }
-      } else {
-        // Sem imagem correspondente, créditos = 0
-        console.log('⚠️  Nenhuma imagem correspondente encontrada, créditos = 0');
+      } catch (error) {
+        console.error('❌ Erro na análise da IA:', error.message);
+        console.log('⚠️  Fallback: créditos definidos como 0');
         calculatedCredits = 0;
       }
     } catch (error) {
       console.log('Erro ao buscar imagem correspondente:', error.message);
+      imageUrl = null;
       calculatedCredits = 0;
     }
 

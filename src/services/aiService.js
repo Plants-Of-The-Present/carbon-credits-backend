@@ -55,7 +55,8 @@ class AIService {
           inferenceTime: result.inference_time,
           metadata: {
             timestamp: result.timestamp,
-            imageSize: result.image_size
+            imageSize: result.image_size,
+            calculatedArea: (totalArea/10000)
           }
         };
       } else {

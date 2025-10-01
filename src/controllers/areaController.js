@@ -100,8 +100,7 @@ const createArea = async (req, res, next) => {
       point3X, point3Y, point4X, point4Y
     });
 
-    const calculatedArea = tempArea.calculateAreaFromCoordinates();
-
+    let calculatedArea = 0;
     let imageUrl = null;
     let calculatedCredits = 0;
     let aiAnalysis = null;
@@ -133,6 +132,7 @@ const createArea = async (req, res, next) => {
 
         if (aiResult.success) {
           calculatedCredits = aiResult.carbonCredits;
+          calculatedArea = aiResult.metadata.calculatedArea;
           aiAnalysis = aiResult.forestAnalysis;
           console.log(`✅ IA calculou ${calculatedCredits} créditos de carbono`);
         } else {

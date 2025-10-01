@@ -5,6 +5,83 @@ const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 const MAP_SIZE = '600x400';
 const MAP_TYPE = 'satellite';
 
+/**
+ * Calcula a distância de Haversine entre dois pontos em coordenadas GPS.
+ * @returns {number} Distância em metros.
+ */
+const haversineDistance = (lat1, lon1, lat2, lon2) => {
+  const R = 6371e3; // Raio da Terra em metros
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
+};
+
+/**
+ * Calcula o nível de zoom adequado para enquadrar um polígono em uma imagem estática.
+ * @param {object[]} points - Array de objetos com 'lat' e 'lng' de cada ponto.
+ * @param {number} imgWidth - Largura da imagem em pixels.
+ * @param {number} imgHeight - Altura da imagem em pixels.
+ * @returns {number} O nível de zoom calculado.
+ */
+const calculateZoom = (points, imgWidth, imgHeight) => {
+  if (points.length < 2) return 15; // Zoom padrão se houver poucos pontos
+
+  const lats = points.map(p => p.lat);
+  const lngs = points.map(p => p.lng);
+
+  const minLat = Math.min(...lats);
+  const maxLat = Math.max(...lats);
+  const minLng = Math.min(...lngs);
+  const maxLng = Math.max(...lngs);
+  
+  const avgLat = (minLat + maxLat) / 2;
+
+  const horizontalDistance = haversineDistance(avgLat, minLng, avgLat, maxLng);
+  const verticalDistance = haversineDistance(minLat, minLng, maxLat, minLng);
+  
+  const metersPerPixelHoriz = horizontalDistance / imgWidth;
+  const metersPerPixelVert = verticalDistance / imgHeight;
+  const metersPerPixel = Math.max(metersPerPixelHoriz, metersPerPixelVert);
+
+  const EARTH_CIRCUMFERENCE_EQUATOR = 40075016.686;
+  const m_per_pixel_equator = EARTH_CIRCUMFERENCE_EQUATOR / 256;
+
+  let zoom = Math.floor(
+    Math.log2(
+      (m_per_pixel_equator * Math.cos(Math.abs(avgLat) * Math.PI / 180)) / metersPerPixel
+    )
+  );
+
+  // Ajusta o zoom para garantir que toda a área caiba na imagem
+  // Subtrair 1-2 níveis de zoom é uma boa prática para evitar cortes
+  zoom -= 1; 
+
+  return Math.min(Math.max(zoom, 1), 20);
+};
+
+/**
+ * Cria a URL para a imagem estática do Google Maps.
+ * @param {string} centerPoint - Coordenadas do centro (lat,lng).
+ * @param {number} zoom - Nível de zoom calculado.
+ * @returns {string} URL completa da imagem.
+ */
+const getStaticMapUrl = (centerPoint, zoom) => {
+  return `https://maps.googleapis.com/maps/api/staticmap?` +
+         `size=${MAP_SIZE}&` +
+         `maptype=${MAP_TYPE}&` +
+         `center=${centerPoint}&` +
+         `zoom=${zoom}&` +
+         `key=${GOOGLE_MAPS_API_KEY}`;
+};
+
 const createArea = async (req, res, next) => {
   try {
     const {
@@ -14,7 +91,6 @@ const createArea = async (req, res, next) => {
       isAllocated, buyerCnpj
     } = req.body;
 
-    // Get user's CNPJ
     const user = await User.findByPk(req.user.id);
     if (!user) {
       return res.status(404).json({
@@ -23,43 +99,38 @@ const createArea = async (req, res, next) => {
       });
     }
 
-    // Create temporary area instance to calculate values
     const tempArea = Area.build({
       point1X, point1Y, point2X, point2Y,
       point3X, point3Y, point4X, point4Y
     });
 
-    // Calculate area BEFORE creating in database
     const calculatedArea = tempArea.calculateAreaFromCoordinates();
 
-    // Search for corresponding image by coordinates
     let imageUrl = null;
     let calculatedCredits = 0;
     let aiAnalysis = null;
+    let calculatedZoom = 0;
 
     try {
-      const visiblePoints = [
-        `${point1Y},${point1X}`,
-        `${point2Y},${point2X}`,
-        `${point3Y},${point3X}`,
-        `${point4Y},${point4X}`,
-      ].join('|');
-
-      const avgLat = (point1Y + point2Y + point3Y + point4Y) / 4;
-      const avgLng = (point1X + point2X + point3X + point4X) / 4;
-      const centerPoint = `${avgLat},${avgLng}`;
-
-      imageUrl = `https://maps.googleapis.com/maps/api/staticmap?` +
-                 `size=${MAP_SIZE}&` +
-                 `maptype=${MAP_TYPE}&` +
-                 `center=${centerPoint}&` +
-                 `visible=${visiblePoints}&` +
-                 `key=${GOOGLE_MAPS_API_KEY}`;
+      const points = [
+        { lat: point1Y, lng: point1X },
+        { lat: point2Y, lng: point2X },
+        { lat: point3Y, lng: point3X },
+        { lat: point4Y, lng: point4X },
+      ];
       
-      imageSource = 'Google Maps Static API';
-      console.log(`URL da Imagem Gerada: ${imageUrl}`);
+      const avgLat = points.reduce((sum, p) => sum + p.lat, 0) / points.length;
+      const avgLng = points.reduce((sum, p) => sum + p.lng, 0) / points.length;
+      const centerPoint = `${avgLat},${avgLng}`;
+      
+      const [imgWidth, imgHeight] = MAP_SIZE.split('x').map(Number);
+      calculatedZoom = calculateZoom(points, imgWidth, imgHeight);
 
-      // Use IA para calcular créditos baseado na imagem
+      imageUrl = getStaticMapUrl(centerPoint, calculatedZoom);
+      
+      console.log(`URL da Imagem Gerada: ${imageUrl}`);
+      console.log(`Zoom Calculado: ${calculatedZoom}`);
+      
       try {
         console.log('🤖 Usando IA para calcular créditos de carbono...');
         const aiResult = await aiService.calculateCarbonCredits(imageUrl);
@@ -77,13 +148,13 @@ const createArea = async (req, res, next) => {
         console.log('⚠️  Fallback: créditos definidos como 0');
         calculatedCredits = 0;
       }
+
     } catch (error) {
       console.log('Erro ao buscar imagem correspondente:', error.message);
       imageUrl = null;
       calculatedCredits = 0;
     }
 
-    // Create area with calculated values and image URL
     const areaData = {
       name,
       point1X, point1Y, point2X, point2Y,

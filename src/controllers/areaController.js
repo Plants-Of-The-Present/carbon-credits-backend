@@ -60,10 +60,6 @@ const calculateZoom = (points, imgWidth, imgHeight) => {
     )
   );
 
-  // Ajusta o zoom para garantir que toda a área caiba na imagem
-  // Subtrair 1-2 níveis de zoom é uma boa prática para evitar cortes
-  zoom -= 1; 
-
   return Math.min(Math.max(zoom, 1), 20);
 };
 
@@ -133,7 +129,7 @@ const createArea = async (req, res, next) => {
       
       try {
         console.log('🤖 Usando IA para calcular créditos de carbono...');
-        const aiResult = await aiService.calculateCarbonCredits(imageUrl);
+        const aiResult = await aiService.calculateCarbonCredits(imageUrl, avgLat, calculatedZoom);
 
         if (aiResult.success) {
           calculatedCredits = aiResult.carbonCredits;

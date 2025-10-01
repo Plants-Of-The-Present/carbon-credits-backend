@@ -22,17 +22,31 @@ class AIService {
     }
   }
 
-  async calculateCarbonCredits(imageUrl) {
+  async calculateCarbonCredits(imageUrl, latitude, zoom) {
     try {
+      if (latitude === undefined || zoom === undefined) {
+        throw new Error('Latitude ou Zoom não foram fornecidos para o cálculo de créditos.');
+      }
+      
       console.log('🌿 Chamando IA para calcular créditos de carbono...');
 
+      // ✨ ALTERAÇÃO CRÍTICA: Incluir latitude e zoom no payload da requisição ✨
       const response = await this.client.post('/calculate-carbon-credits', {
-        url: imageUrl
+        url: imageUrl,
+        latitude: latitude, // Enviando a latitude média calculada
+        zoom: zoom        // Enviando o zoom dinâmico calculado
       });
 
       if (response.data.success) {
         const result = response.data.data;
-        console.log(`✅ IA calculou ${result.carbon_credits} créditos de carbono`);
+        
+        // Exibe a área real calculada para cada classe (opcional, mas útil para debug)
+        const totalArea = result.forest_analysis 
+            ? Object.values(result.forest_analysis).reduce((sum, item) => sum + item.area_sq_m, 0) 
+            : 0;
+
+        console.log(`✅ IA calculou ${result.carbon_credits} créditos de carbono.`);
+        console.log(`(Área total analisada: ${totalArea.toFixed(2)} m²)`);
 
         return {
           success: true,

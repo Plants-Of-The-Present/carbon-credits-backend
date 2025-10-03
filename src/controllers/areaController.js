@@ -1,9 +1,58 @@
 const { Area, User, Image } = require('../../database/models');
 const aiService = require('../services/aiService');
 
+// Huawei Cloud OBS
+const axios = require('axios');
+const ObsClient = require('esdk-obs-nodejs');
+const path = require('path');
+const { v4: uuidv4 } = require('uuid');
+const BUCKET_NAME = process.env.HUAWEI_OBS_BUCKET;
+
+const obsClient = new ObsClient({
+  access_key_id: process.env.HUAWEI_OBS_ACCESS_KEY,
+  secret_access_key: process.env.HUAWEI_OBS_SECRET_KEY,
+  server: process.env.HUAWEI_OBS_ENDPOINT,
+});
+
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 const MAP_SIZE = '600x400';
 const MAP_TYPE = 'satellite';
+
+const uploadImageToObs = async (url) => {
+  const response = await axios({
+    url,
+    method: 'GET',
+    responseType: 'stream',
+    headers: {
+      'Accept': 'image/png,image/jpeg,*/*',
+      'User-Agent': 'carbon-credits-backend/1.0'
+    }
+  });
+
+  const contentType = response.headers['content-type'] || 'application/octet-stream';
+  if (!contentType.startsWith('image/')) {
+    // ler um pedaço do stream para logar seria mais complexo; aqui apenas aborta
+    throw new Error('Google Maps não retornou uma imagem.');
+  }
+
+  const filename = `${uuidv4()}.png`;
+  const key = `areas/${filename}`;
+
+  // response.data é um stream legível; envia diretamente
+  const result = await obsClient.putObject({
+    Bucket: process.env.HUAWEI_OBS_BUCKET,
+    Key: key,
+    Body: response.data,              // stream
+    ContentType: contentType,
+    // ContentLength pode ser omitido se você enviar stream; porém alguns serviços pedem
+    ACL: 'public-read'
+  });
+
+  if (result.CommonMsg.Status === 200) {
+    return `https://${process.env.HUAWEI_OBS_BUCKET}.${process.env.HUAWEI_OBS_ENDPOINT}/${key}`;
+  }
+  throw new Error('Falha no upload para o OBS');
+};
 
 /**
  * Calcula a distância de Haversine entre dois pontos em coordenadas GPS.
@@ -102,6 +151,7 @@ const createArea = async (req, res, next) => {
 
     let calculatedArea = 0;
     let imageUrl = null;
+    let imageUrlAPI = null;
     let calculatedCredits = 0;
     let aiAnalysis = null;
     let calculatedZoom = 0;
@@ -121,9 +171,10 @@ const createArea = async (req, res, next) => {
       const [imgWidth, imgHeight] = MAP_SIZE.split('x').map(Number);
       calculatedZoom = calculateZoom(points, imgWidth, imgHeight);
 
-      imageUrl = getStaticMapUrl(centerPoint, calculatedZoom);
+      imageUrlAPI = getStaticMapUrl(centerPoint, calculatedZoom);
+      imageUrl = await uploadImageToObs(imageUrlAPI);
       
-      console.log(`URL da Imagem Gerada: ${imageUrl}`);
+      console.log(`URL da Imagem Gerada: ${imageUrlAPI}`);
       console.log(`Zoom Calculado: ${calculatedZoom}`);
       
       try {
